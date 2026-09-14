@@ -18,6 +18,7 @@ if (!globalForDb.__alwaei_db) {
 }
 
 db.exec(`
+  PRAGMA busy_timeout = 10000;
   PRAGMA journal_mode = WAL;
 
   CREATE TABLE IF NOT EXISTS categories (
