@@ -75,13 +75,13 @@ if (!existingAdmin) {
   const hash = bcrypt.hashSync(adminPassword, 10);
   db.prepare(
     "INSERT INTO admin_users (email, password_hash, name) VALUES (?, ?, ?)"
-  ).run(adminEmail, hash, "أكرم شمس");
+  ).run(adminEmail, hash, "أكرم شمص");
   console.log(`تم إنشاء حساب الأدمن: ${adminEmail} / ${adminPassword}`);
 } else {
   console.log("حساب الأدمن موجود مسبقاً، تم تخطي إنشائه.");
 }
 
-const AUTHOR = "د. أكرم شمس";
+const AUTHOR = "د. أكرم شمص";
 
 const articles = [
   {
