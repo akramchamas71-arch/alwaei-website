@@ -3,6 +3,10 @@ import { getCategoryBySlug, getArticlesByCategory } from "@/lib/data";
 import ArticleCard from "@/components/ArticleCard";
 import type { Metadata } from "next";
 
+// Always render with the latest data from the database so admin edits
+// (new articles, status changes, author corrections) show up immediately.
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata(
   props: PageProps<"/category/[slug]">
 ): Promise<Metadata> {
