@@ -7,16 +7,16 @@
 @import "@fontsource/cairo/800.css";
 
 :root {
-  --background: #f8f6f2;
+  --background: #f6f4ef;
   --surface: #ffffff;
-  --foreground: #201a17;
-  --muted: #6b6058;
-  --border: #e7e0d6;
-  --brand: #7c1620;
-  --brand-dark: #5a0f17;
-  --brand-light: #a52631;
-  --gold: #b8892f;
-  --ink: #14100e;
+  --foreground: #1b2430;
+  --muted: #68707c;
+  --border: #e3ded3;
+  --brand: #1f3b5c;
+  --brand-dark: #142840;
+  --brand-light: #3d6089;
+  --gold: #ab7a3f;
+  --ink: #121820;
 }
 
 @theme inline {
@@ -43,6 +43,15 @@ h1, h2, h3, h4, .font-heading {
   font-family: var(--font-heading);
 }
 
+::selection {
+  background: var(--gold);
+  color: #ffffff;
+}
+
+a {
+  text-underline-offset: 3px;
+}
+
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -66,4 +75,19 @@ h1, h2, h3, h4, .font-heading {
 
 .prose-article p {
   margin-bottom: 1.4em;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.section-heading::before {
+  content: "";
+  display: block;
+  width: 4px;
+  height: 1.4rem;
+  background: var(--gold);
+  border-radius: 2px;
 }
