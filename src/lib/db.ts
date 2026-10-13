@@ -72,6 +72,12 @@ if (!articleColumns.some((c) => c.name === "external_url")) {
   db.exec("ALTER TABLE articles ADD COLUMN external_url TEXT");
 }
 
+// One-time correction: the admin display name was seeded with a misspelling
+// of the author's surname (شمس instead of شمص).
+db.exec(
+  `UPDATE admin_users SET name = 'أكرم شمص' WHERE name = 'أكرم شمس'`
+);
+
 export function getSetting(key: string, fallback = ""): string {
   const row = db
     .prepare("SELECT value FROM site_settings WHERE key = ?")
