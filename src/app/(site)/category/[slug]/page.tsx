@@ -20,8 +20,8 @@ export default async function CategoryPage(props: PageProps<"/category/[slug]">)
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <div className="mb-6 border-b-2 border-brand pb-2">
-        <h1 className="font-heading font-extrabold text-2xl text-brand">
+      <div className="mb-6">
+        <h1 className="section-heading font-heading font-extrabold text-2xl text-foreground">
           {category.name}
         </h1>
       </div>
