@@ -56,10 +56,21 @@ export async function getSessionUser(): Promise<AdminUser | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret);
+    const id = payload.id as number;
+    const email = payload.email as string;
+
+    // Re-read the display name from the database on every request instead
+    // of trusting the value baked into the token at login time, so admin
+    // profile edits (e.g. correcting a name) show up immediately without
+    // requiring everyone to log out and back in.
+    const row = db
+      .prepare("SELECT name FROM admin_users WHERE id = ?")
+      .get(id) as { name: string } | undefined;
+
     return {
-      id: payload.id as number,
-      email: payload.email as string,
-      name: payload.name as string,
+      id,
+      email,
+      name: row?.name ?? (payload.name as string),
     };
   } catch {
     return null;
