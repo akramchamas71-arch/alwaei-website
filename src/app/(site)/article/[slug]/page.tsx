@@ -5,6 +5,10 @@ import { formatDate } from "@/lib/format";
 import ArticleCard from "@/components/ArticleCard";
 import type { Metadata } from "next";
 
+// Always render with the latest data from the database so admin edits
+// (status changes, author corrections, new images) show up immediately.
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata(
   props: PageProps<"/article/[slug]">
 ): Promise<Metadata> {
@@ -71,7 +75,7 @@ export default async function ArticlePage(props: PageProps<"/article/[slug]">) {
 
       {related.length > 0 && (
         <section className="mt-14">
-          <h2 className="font-heading font-extrabold text-xl text-brand border-b-2 border-brand pb-2 mb-4">
+          <h2 className="section-heading font-heading font-extrabold text-xl text-foreground mb-4">
             مقالات ذات صلة
           </h2>
           <div className="grid sm:grid-cols-2 gap-5">
