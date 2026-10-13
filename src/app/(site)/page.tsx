@@ -2,6 +2,11 @@ import Link from "next/link";
 import { getFeaturedArticles, getPublishedArticles, getCategories } from "@/lib/data";
 import ArticleCard from "@/components/ArticleCard";
 
+// Always render with the latest data from the database: this is a
+// CMS-backed site where admin edits should show up immediately, not after
+// an on-demand revalidation that may not fire for every code path.
+export const dynamic = "force-dynamic";
+
 export default function HomePage() {
   const featured = getFeaturedArticles(4);
   const latest = getPublishedArticles(13);
