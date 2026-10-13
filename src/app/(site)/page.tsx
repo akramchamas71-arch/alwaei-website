@@ -28,8 +28,10 @@ export default function HomePage() {
       )}
 
       <section className="mb-10">
-        <div className="flex items-center justify-between mb-4 border-b-2 border-brand pb-2">
-          <h2 className="font-heading font-extrabold text-xl text-brand">آخر المقالات</h2>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="section-heading font-heading font-extrabold text-xl text-foreground">
+            آخر المقالات
+          </h2>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {latestExcludingFeatured.slice(0, 9).map((a) => (
@@ -38,16 +40,23 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {categories.slice(0, 8).map((c) => (
-          <Link
-            key={c.id}
-            href={`/category/${c.slug}`}
-            className="bg-surface border border-[var(--border)] rounded-lg p-4 text-center font-heading font-bold hover:border-brand hover:text-brand transition"
-          >
-            {c.name}
-          </Link>
-        ))}
+      <section>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="section-heading font-heading font-extrabold text-xl text-foreground">
+            الأقسام
+          </h2>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {categories.slice(0, 8).map((c) => (
+            <Link
+              key={c.id}
+              href={`/category/${c.slug}`}
+              className="bg-surface border border-[var(--border)] rounded-lg p-4 text-center font-heading font-bold hover:border-brand hover:text-brand transition"
+            >
+              {c.name}
+            </Link>
+          ))}
+        </div>
       </section>
     </div>
   );
