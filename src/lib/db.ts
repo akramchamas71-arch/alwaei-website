@@ -63,6 +63,15 @@ db.exec(`
   );
 `);
 
+// Migration: add external_url to articles if it doesn't exist yet (used for
+// linking a book/article to an external order or promo page).
+const articleColumns = db.prepare("PRAGMA table_info(articles)").all() as {
+  name: string;
+}[];
+if (!articleColumns.some((c) => c.name === "external_url")) {
+  db.exec("ALTER TABLE articles ADD COLUMN external_url TEXT");
+}
+
 export function getSetting(key: string, fallback = ""): string {
   const row = db
     .prepare("SELECT value FROM site_settings WHERE key = ?")
