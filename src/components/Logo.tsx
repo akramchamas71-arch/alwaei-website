@@ -6,8 +6,8 @@ type LogoProps = {
 // Original wordmark logo for "الوعي" (Al-Wa'i): a stylised radiating-eye
 // glyph — an abstract emblem of awareness/insight — beside the site name.
 export default function Logo({ className = "", variant = "dark" }: LogoProps) {
-  const ink = variant === "dark" ? "#7c1620" : "#f2e6c9";
-  const textColor = variant === "dark" ? "#14100e" : "#ffffff";
+  const ink = variant === "dark" ? "#1f3b5c" : "#ab7a3f";
+  const textColor = variant === "dark" ? "#1b2430" : "#ffffff";
 
   return (
     <div className={`flex items-center gap-3 ${className}`}>
@@ -27,7 +27,7 @@ export default function Logo({ className = "", variant = "dark" }: LogoProps) {
           strokeLinejoin="round"
         />
         <circle cx="21" cy="21" r="6.5" fill={ink} />
-        <circle cx="23.2" cy="18.8" r="1.6" fill={variant === "dark" ? "#f8f6f2" : "#14100e"} />
+        <circle cx="23.2" cy="18.8" r="1.6" fill={variant === "dark" ? "#f6f4ef" : "#121820"} />
       </svg>
       <span
         className="font-heading font-extrabold text-2xl tracking-tight"
