@@ -65,11 +65,25 @@ db.exec(`
 
 // Migration: add external_url to articles if it doesn't exist yet (used for
 // linking a book/article to an external order or promo page).
+//
+// Next's production build spins up several worker processes that each
+// import this module against the same on-disk database file at roughly
+// the same time. The PRAGMA check below can pass in more than one worker
+// before any of them finishes the ALTER TABLE, so the ALTER itself is
+// wrapped in a try/catch and a "duplicate column" failure from losing
+// that race is swallowed rather than crashing the build.
 const articleColumns = db.prepare("PRAGMA table_info(articles)").all() as {
   name: string;
 }[];
 if (!articleColumns.some((c) => c.name === "external_url")) {
-  db.exec("ALTER TABLE articles ADD COLUMN external_url TEXT");
+  try {
+    db.exec("ALTER TABLE articles ADD COLUMN external_url TEXT");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!/duplicate column/i.test(message)) {
+      throw err;
+    }
+  }
 }
 
 // One-time correction: the admin display name was seeded with a misspelling
