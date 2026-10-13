@@ -18,7 +18,7 @@ export default function AdminDashboard() {
         </Link>
       </div>
 
-      <div className="bg-white rounded-lg border border-[var(--border)] overflow-hidden">
+      <div className="bg-white rounded-lg border border-[var(--border)] overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-[var(--background)] text-start">
             <tr>
@@ -26,17 +26,17 @@ export default function AdminDashboard() {
               <th className="p-3 text-start">القسم</th>
               <th className="p-3 text-start">الحالة</th>
               <th className="p-3 text-start">التاريخ</th>
-              <th className="p-3 text-start">إجراءات</th>
+              <th className="p-3 text-start sticky end-0 bg-[var(--background)]">إجراءات</th>
             </tr>
           </thead>
           <tbody>
             {articles.map((a) => (
               <tr key={a.id} className="border-t border-[var(--border)]">
                 <td className="p-3 font-semibold max-w-xs truncate">{a.title}</td>
-                <td className="p-3 text-muted">{a.category_name}</td>
+                <td className="p-3 text-muted whitespace-nowrap">{a.category_name}</td>
                 <td className="p-3">
                   <span
-                    className={`px-2 py-0.5 rounded text-xs ${
+                    className={`px-2 py-0.5 rounded text-xs whitespace-nowrap ${
                       a.status === "published"
                         ? "bg-green-100 text-green-700"
                         : "bg-yellow-100 text-yellow-700"
@@ -45,18 +45,18 @@ export default function AdminDashboard() {
                     {a.status === "published" ? "منشور" : "مسودة"}
                   </span>
                 </td>
-                <td className="p-3 text-muted">{formatDate(a.published_at)}</td>
-                <td className="p-3">
+                <td className="p-3 text-muted whitespace-nowrap">{formatDate(a.published_at)}</td>
+                <td className="p-3 sticky end-0 bg-white">
                   <div className="flex items-center gap-3">
                     <Link
                       href={`/admin/articles/${a.id}/edit`}
-                      className="text-brand hover:underline"
+                      className="text-brand font-semibold hover:underline whitespace-nowrap"
                     >
                       تعديل
                     </Link>
                     <form action={deleteArticleAction}>
                       <input type="hidden" name="id" value={a.id} />
-                      <button className="text-red-600 hover:underline">حذف</button>
+                      <button className="text-red-600 font-semibold hover:underline whitespace-nowrap">حذف</button>
                     </form>
                   </div>
                 </td>
