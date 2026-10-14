@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getArticleBySlug, getArticlesByCategory } from "@/lib/data";
 import { formatDate } from "@/lib/format";
 import ArticleCard from "@/components/ArticleCard";
+import Reveal from "@/components/Reveal";
 import type { Metadata } from "next";
 
 // Always render with the latest data from the database so admin edits
@@ -74,16 +75,18 @@ export default async function ArticlePage(props: PageProps<"/article/[slug]">) {
       </div>
 
       {related.length > 0 && (
-        <section className="mt-14">
-          <h2 className="section-heading font-heading font-extrabold text-xl text-foreground mb-4">
-            مقالات ذات صلة
-          </h2>
-          <div className="grid sm:grid-cols-2 gap-5">
-            {related.slice(0, 2).map((a) => (
-              <ArticleCard key={a.id} article={a} />
-            ))}
-          </div>
-        </section>
+        <Reveal>
+          <section className="mt-14">
+            <h2 className="section-heading font-heading font-extrabold text-xl text-foreground mb-4">
+              مقالات ذات صلة
+            </h2>
+            <div className="grid sm:grid-cols-2 gap-5">
+              {related.slice(0, 2).map((a) => (
+                <ArticleCard key={a.id} article={a} />
+              ))}
+            </div>
+          </section>
+        </Reveal>
       )}
     </div>
   );
