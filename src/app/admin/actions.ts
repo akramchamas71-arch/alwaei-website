@@ -44,7 +44,13 @@ async function saveUploadedImage(file: File | null): Promise<string | null> {
   const bytes = Buffer.from(await file.arrayBuffer());
   const ext = path.extname(file.name) || ".jpg";
   const filename = `${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`;
-  const uploadsDir = path.join(process.cwd(), "public", "uploads");
+  // Images are written under the same `data/` directory as the SQLite
+  // database, which lives on Railway's persistent volume. `public/` is
+  // rebuilt from the git source on every deploy, so a file written there
+  // at runtime (the previous behavior) would silently disappear the next
+  // time the service redeployed or restarted. Serving is handled by the
+  // route at src/app/uploads/[filename]/route.ts.
+  const uploadsDir = path.join(process.cwd(), "data", "uploads");
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
   fs.writeFileSync(path.join(uploadsDir, filename), bytes);
   return `/uploads/${filename}`;
