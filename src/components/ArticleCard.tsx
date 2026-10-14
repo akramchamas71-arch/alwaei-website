@@ -13,14 +13,14 @@ export default function ArticleCard({
     size === "large" ? "text-2xl sm:text-3xl" : size === "small" ? "text-base" : "text-lg";
 
   return (
-    <article className="group flex flex-col bg-surface rounded-lg overflow-hidden border border-[var(--border)] hover:shadow-md transition h-full">
+    <article className="group flex flex-col bg-surface rounded-lg overflow-hidden border border-[var(--border)] transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-brand/40 focus-within:-translate-y-1 focus-within:shadow-xl focus-within:ring-2 focus-within:ring-[var(--gold)] focus-within:ring-offset-2 h-full">
       <Link href={`/article/${article.slug}`} className="block relative aspect-video bg-gradient-to-br from-brand to-brand-dark overflow-hidden">
         {article.cover_image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={article.cover_image}
             alt={article.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+            className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-white/30 font-heading text-4xl font-black">
