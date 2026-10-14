@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getCategoryBySlug, getArticlesByCategory } from "@/lib/data";
 import ArticleCard from "@/components/ArticleCard";
+import Reveal from "@/components/Reveal";
 import type { Metadata } from "next";
 
 // Always render with the latest data from the database so admin edits
@@ -34,11 +35,13 @@ export default async function CategoryPage(props: PageProps<"/category/[slug]">)
           لا توجد مقالات منشورة في هذا القسم بعد.
         </p>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {articles.map((a) => (
-            <ArticleCard key={a.id} article={a} />
-          ))}
-        </div>
+        <Reveal>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {articles.map((a) => (
+              <ArticleCard key={a.id} article={a} />
+            ))}
+          </div>
+        </Reveal>
       )}
     </div>
   );
