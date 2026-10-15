@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
 
-// Uploaded article images are written to `data/uploads` (see
-// src/app/admin/actions.ts) because that directory sits on Railway's
+// Uploaded article images and PDF attachments are written to `data/uploads`
+// (see src/app/admin/actions.ts) because that directory sits on Railway's
 // persistent volume, unlike `public/`, which is rebuilt from git on every
 // deploy. This route serves those files back out at the same `/uploads/...`
 // URL the rest of the site already expects.
@@ -17,6 +17,7 @@ const CONTENT_TYPES: Record<string, string> = {
   ".gif": "image/gif",
   ".svg": "image/svg+xml",
   ".avif": "image/avif",
+  ".pdf": "application/pdf",
 };
 
 export async function GET(
