@@ -86,6 +86,25 @@ if (!articleColumns.some((c) => c.name === "external_url")) {
   }
 }
 
+// Migration: add pdf_file to articles if it doesn't exist yet. Stores the
+// path (e.g. /uploads/169...-123.pdf) to an admin-uploaded PDF for the
+// article — used both for "download this article as PDF" and for
+// PDF-only articles that have no typed content at all. Same
+// parallel-worker race guard as the migration above.
+const articleColumnsForPdf = db.prepare("PRAGMA table_info(articles)").all() as {
+  name: string;
+}[];
+if (!articleColumnsForPdf.some((c) => c.name === "pdf_file")) {
+  try {
+    db.exec("ALTER TABLE articles ADD COLUMN pdf_file TEXT");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!/duplicate column/i.test(message)) {
+      throw err;
+    }
+  }
+}
+
 // One-time correction: the admin display name was seeded with a misspelling
 // of the author's surname (شمس instead of شمص).
 db.exec(
