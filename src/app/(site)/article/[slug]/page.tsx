@@ -36,6 +36,10 @@ export default async function ArticlePage(props: PageProps<"/article/[slug]">) {
     .map((p) => p.trim())
     .filter(Boolean);
 
+  const isPdfOnly = !!article.pdf_file && paragraphs.length === 0;
+  const downloadHref = article.pdf_file || `/article/${article.slug}/print?autoprint=1`;
+  const downloadIsDirectFile = !!article.pdf_file;
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
       <nav className="text-sm text-muted mb-4">
@@ -68,11 +72,46 @@ export default async function ArticlePage(props: PageProps<"/article/[slug]">) {
         />
       )}
 
-      <div className="prose-article">
-        {paragraphs.map((p, i) => (
-          <p key={i}>{p}</p>
-        ))}
-      </div>
+      {isPdfOnly ? (
+        <div className="mb-8">
+          <div className="rounded-lg overflow-hidden border border-[var(--border)] h-[75vh] bg-[var(--surface)]">
+            <iframe
+              src={article.pdf_file!}
+              title={article.title}
+              className="w-full h-full"
+            />
+          </div>
+          <a
+            href={article.pdf_file!}
+            download
+            className="mt-4 inline-flex items-center gap-2 bg-brand text-white px-5 py-2.5 rounded-lg font-heading font-bold hover:bg-brand-dark transition"
+          >
+            <DownloadIcon />
+            تحميل الملف (PDF)
+          </a>
+        </div>
+      ) : (
+        <>
+          <div className="prose-article">
+            {paragraphs.map((p, i) => (
+              <p key={i}>{p}</p>
+            ))}
+          </div>
+
+          <div className="mt-8">
+            <a
+              href={downloadHref}
+              download={downloadIsDirectFile || undefined}
+              target={downloadIsDirectFile ? undefined : "_blank"}
+              rel={downloadIsDirectFile ? undefined : "noopener"}
+              className="inline-flex items-center gap-2 border border-brand text-brand px-5 py-2.5 rounded-lg font-heading font-bold hover:bg-brand hover:text-white transition"
+            >
+              <DownloadIcon />
+              {downloadIsDirectFile ? "تحميل المقال (PDF)" : "تحميل / طباعة المقال (PDF)"}
+            </a>
+          </div>
+        </>
+      )}
 
       {related.length > 0 && (
         <Reveal>
@@ -89,5 +128,25 @@ export default async function ArticlePage(props: PageProps<"/article/[slug]">) {
         </Reveal>
       )}
     </div>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 3v12" />
+      <path d="m7 11 5 5 5-5" />
+      <path d="M5 20h14" />
+    </svg>
   );
 }
