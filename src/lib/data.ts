@@ -24,6 +24,7 @@ export type Article = {
   excerpt: string;
   content: string;
   cover_image: string | null;
+  pdf_file: string | null;
   category_id: number;
   author_name: string;
   status: "published" | "draft";
@@ -138,6 +139,7 @@ export type ArticleInput = {
   excerpt: string;
   content: string;
   cover_image: string | null;
+  pdf_file: string | null;
   category_id: number;
   author_name: string;
   status: "published" | "draft";
@@ -148,8 +150,8 @@ export type ArticleInput = {
 export function createArticle(input: ArticleInput): number {
   const stmt = db.prepare(`
     INSERT INTO articles
-      (slug, title, excerpt, content, cover_image, category_id, author_name, status, is_featured, published_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (slug, title, excerpt, content, cover_image, pdf_file, category_id, author_name, status, is_featured, published_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const result = stmt.run(
     input.slug,
@@ -157,6 +159,7 @@ export function createArticle(input: ArticleInput): number {
     input.excerpt,
     input.content,
     input.cover_image,
+    input.pdf_file,
     input.category_id,
     input.author_name,
     input.status,
@@ -169,7 +172,7 @@ export function createArticle(input: ArticleInput): number {
 export function updateArticle(id: number, input: ArticleInput) {
   db.prepare(`
     UPDATE articles SET
-      slug = ?, title = ?, excerpt = ?, content = ?, cover_image = ?,
+      slug = ?, title = ?, excerpt = ?, content = ?, cover_image = ?, pdf_file = ?,
       category_id = ?, author_name = ?, status = ?, is_featured = ?,
       published_at = ?, updated_at = datetime('now')
     WHERE id = ?
@@ -179,6 +182,7 @@ export function updateArticle(id: number, input: ArticleInput) {
     input.excerpt,
     input.content,
     input.cover_image,
+    input.pdf_file,
     input.category_id,
     input.author_name,
     input.status,
