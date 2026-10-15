@@ -39,17 +39,20 @@ async function requireAuth() {
   return user;
 }
 
-async function saveUploadedImage(file: File | null): Promise<string | null> {
+// Shared by the cover-image upload and the PDF-attachment upload: both are
+// written under the same `data/` directory as the SQLite database, which
+// lives on Railway's persistent volume. `public/` is rebuilt from the git
+// source on every deploy, so a file written there at runtime would
+// silently disappear the next time the service redeployed or restarted.
+// Serving is handled by the route at src/app/uploads/[filename]/route.ts.
+async function saveUploadedFile(
+  file: File | null,
+  fallbackExt = ""
+): Promise<string | null> {
   if (!file || file.size === 0) return null;
   const bytes = Buffer.from(await file.arrayBuffer());
-  const ext = path.extname(file.name) || ".jpg";
+  const ext = path.extname(file.name) || fallbackExt;
   const filename = `${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`;
-  // Images are written under the same `data/` directory as the SQLite
-  // database, which lives on Railway's persistent volume. `public/` is
-  // rebuilt from the git source on every deploy, so a file written there
-  // at runtime (the previous behavior) would silently disappear the next
-  // time the service redeployed or restarted. Serving is handled by the
-  // route at src/app/uploads/[filename]/route.ts.
   const uploadsDir = path.join(process.cwd(), "data", "uploads");
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
   fs.writeFileSync(path.join(uploadsDir, filename), bytes);
@@ -74,15 +77,20 @@ export async function saveArticleAction(formData: FormData) {
   if (!slug) slug = slugify(title);
 
   const imageFile = formData.get("cover_image") as File | null;
-  const uploadedPath = await saveUploadedImage(imageFile);
+  const uploadedImage = await saveUploadedFile(imageFile, ".jpg");
   const existingImage = String(formData.get("existing_cover_image") || "") || null;
+
+  const pdfFile = formData.get("pdf_file") as File | null;
+  const uploadedPdf = await saveUploadedFile(pdfFile, ".pdf");
+  const existingPdf = String(formData.get("existing_pdf_file") || "") || null;
 
   const input: ArticleInput = {
     slug,
     title,
     excerpt,
     content,
-    cover_image: uploadedPath || existingImage,
+    cover_image: uploadedImage || existingImage,
+    pdf_file: uploadedPdf || existingPdf,
     category_id: categoryId,
     author_name: authorName || "الوعي",
     status,
