@@ -16,6 +16,9 @@ export default function ArticleForm({
       {article?.cover_image && (
         <input type="hidden" name="existing_cover_image" value={article.cover_image} />
       )}
+      {article?.pdf_file && (
+        <input type="hidden" name="existing_pdf_file" value={article.pdf_file} />
+      )}
 
       <div>
         <label className="block text-sm font-semibold mb-1">العنوان</label>
@@ -55,11 +58,11 @@ export default function ArticleForm({
           name="content"
           defaultValue={article?.content}
           rows={16}
-          required
           className="w-full border border-[var(--border)] rounded-lg px-3 py-2 leading-8"
         />
         <p className="text-xs text-muted mt-1">
-          افصل بين الفقرات بسطر فارغ.
+          افصل بين الفقرات بسطر فارغ. يمكنك ترك هذا الحقل فارغاً إذا كان
+          المقال عبارة عن ملف PDF فقط (أرفقه أدناه) بلا نص مكتوب.
         </p>
       </div>
 
@@ -121,6 +124,26 @@ export default function ArticleForm({
             alt="الغلاف الحالي"
             className="mt-2 h-28 rounded-lg object-cover"
           />
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-semibold mb-1">ملف PDF (اختياري)</label>
+        <input type="file" name="pdf_file" accept="application/pdf" className="block" />
+        <p className="text-xs text-muted mt-1">
+          إن رفعت ملفاً هنا، يظهر للزوار زر &quot;تحميل الملف&quot; في صفحة
+          المقال. إن تركت حقل المحتوى فارغاً، سيُعرض هذا الملف مباشرة كمقال
+          كامل بدل النص.
+        </p>
+        {article?.pdf_file && (
+          <a
+            href={article.pdf_file}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-block text-sm text-brand underline"
+          >
+            عرض الملف الحالي ↗
+          </a>
         )}
       </div>
 
