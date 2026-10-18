@@ -13,7 +13,12 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const { slug } = await props.params;
   const category = getCategoryBySlug(slug);
-  return { title: category ? category.name : "قسم غير موجود" };
+  if (!category) return { title: "قسم غير موجود" };
+  return {
+    title: category.name,
+    description: `أحدث المقالات والتحليلات في قسم ${category.name} على موقع الوعي.`,
+    alternates: { canonical: `/category/${category.slug}` },
+  };
 }
 
 export default async function CategoryPage(props: PageProps<"/category/[slug]">) {
