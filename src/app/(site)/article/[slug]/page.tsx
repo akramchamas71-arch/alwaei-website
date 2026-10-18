@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getArticleBySlug, getArticlesByCategory } from "@/lib/data";
 import { formatDate } from "@/lib/format";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 import ArticleCard from "@/components/ArticleCard";
 import Reveal from "@/components/Reveal";
 import type { Metadata } from "next";
@@ -19,6 +20,25 @@ export async function generateMetadata(
   return {
     title: article.title,
     description: article.excerpt,
+    alternates: { canonical: `/article/${article.slug}` },
+    // Powers the preview card when an article link is shared on Facebook,
+    // Telegram, X, or WhatsApp — without this, a shared link shows no
+    // title/image and people are much less likely to click through.
+    openGraph: {
+      title: article.title,
+      description: article.excerpt,
+      type: "article",
+      publishedTime: article.published_at,
+      modifiedTime: article.updated_at || undefined,
+      authors: [article.author_name],
+      images: article.cover_image ? [{ url: article.cover_image }] : undefined,
+    },
+    twitter: {
+      card: article.cover_image ? "summary_large_image" : "summary",
+      title: article.title,
+      description: article.excerpt,
+      images: article.cover_image ? [article.cover_image] : undefined,
+    },
   };
 }
 
@@ -40,8 +60,33 @@ export default async function ArticlePage(props: PageProps<"/article/[slug]">) {
   const downloadHref = article.pdf_file || `/article/${article.slug}/print?autoprint=1`;
   const downloadIsDirectFile = !!article.pdf_file;
 
+  // Structured data so Google can understand this page as an article (and
+  // potentially show the author, publish date, or an image in search
+  // results) rather than just an unlabeled page of text.
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+    headline: article.title,
+    description: article.excerpt,
+    image: article.cover_image ? [`${SITE_URL}${article.cover_image}`] : undefined,
+    datePublished: article.published_at,
+    dateModified: article.updated_at || article.published_at,
+    author: { "@type": "Person", name: article.author_name },
+    publisher: { "@type": "Organization", name: SITE_NAME },
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": `${SITE_URL}/article/${article.slug}`,
+    },
+  };
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
+        }}
+      />
       <nav className="text-sm text-muted mb-4">
         <Link href="/" className="hover:text-brand">الرئيسية</Link>
         <span className="mx-2">/</span>
