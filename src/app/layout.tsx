@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     template: "%s | الوعي",
   },
   description: SITE_DESCRIPTION,
-  // Google Search Console ownership verification (HTML tag method).
+  // Google Search Console ownership verification (HTML tag method, redeploy).
   verification: {
     google: "mjLvCeVvhldWb0Ze5YycURgwQ6h8uwYjVLrK4NI205w",
   },
