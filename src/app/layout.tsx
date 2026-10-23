@@ -17,6 +17,10 @@ export const metadata: Metadata = {
     template: "%s | الوعي",
   },
   description: SITE_DESCRIPTION,
+  // Google Search Console ownership verification (HTML tag method).
+  verification: {
+    google: "mjLvCeVvhldWb0Ze5YycURgwQ6h8uwYjVLrK4NI205w",
+  },
   // Default Open Graph/Twitter data so a link to the homepage (or any page
   // that doesn't set its own) still shows a proper title/description card
   // when shared on Facebook, Telegram, X, or WhatsApp.
