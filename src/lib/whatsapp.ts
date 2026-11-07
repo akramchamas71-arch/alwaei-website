@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import makeWASocket, {
   useMultiFileAuthState,
@@ -26,6 +26,7 @@ const AUTH_DIR = path.join(process.cwd(), "data", "whatsapp-auth");
 const GROUP_JID_KEY = "whatsapp_group_jid";
 const GROUP_NAME_KEY = "whatsapp_group_name";
 const SEND_SPACING_MS = 2500;
+const MAX_RECONNECT_ATTEMPTS = 5;
 
 export type WhatsAppStatus = {
   state: "disconnected" | "connecting" | "pairing" | "connected";
@@ -39,6 +40,7 @@ const globalForWa = globalThis as unknown as {
     status: WhatsAppStatus;
     starting: boolean;
     sendQueue: Promise<void>;
+    reconnectAttempts: number;
   };
 };
 
@@ -49,6 +51,7 @@ const g =
     status: { state: "disconnected", detail: "غير مرتبط بعد", pairingCode: null } as WhatsAppStatus,
     starting: false,
     sendQueue: Promise.resolve(),
+    reconnectAttempts: 0,
   };
 if (!globalForWa.__alwaei_wa) globalForWa.__alwaei_wa = g;
 
@@ -56,6 +59,17 @@ const logger = pino({ level: "error" });
 
 function ensureAuthDir() {
   if (!existsSync(AUTH_DIR)) mkdirSync(AUTH_DIR, { recursive: true });
+}
+
+// Wipes a never-completed or logged-out session so the next pairing
+// attempt starts from a clean slate instead of repeatedly retrying
+// against stale, broken credentials.
+function resetAuthDir() {
+  try {
+    if (existsSync(AUTH_DIR)) rmSync(AUTH_DIR, { recursive: true, force: true });
+  } catch (err) {
+    console.error("[whatsapp] failed to reset auth dir:", err);
+  }
 }
 
 export function hasStoredCredentials(): boolean {
@@ -79,7 +93,10 @@ export function setConfiguredGroup(jid: string, name: string): void {
 
 // Starts (or resumes) the WhatsApp connection. Pass a phone number only
 // when the admin is actively pairing a brand-new device; omit it to just
-// resume an already-linked session (e.g. on server boot).
+// resume an already-linked session (e.g. on server boot). Never throws —
+// every failure is reported through getWhatsAppStatus() instead, so a
+// bad phone number or a dropped connection can't crash the admin page
+// that triggered it (or, via the boot-time auto-resume, the server).
 export async function startWhatsApp(phoneNumberForPairing?: string): Promise<void> {
   if (g.starting) return;
   g.starting = true;
@@ -99,29 +116,58 @@ export async function startWhatsApp(phoneNumberForPairing?: string): Promise<voi
     sock.ev.on("creds.update", saveCreds);
 
     sock.ev.on("connection.update", (update) => {
-      const { connection, lastDisconnect } = update;
-      if (connection === "open") {
-        g.status = { state: "connected", detail: "متصل بواتساب", pairingCode: null };
-      } else if (connection === "connecting") {
-        g.status = { ...g.status, state: "connecting", detail: "جارٍ الاتصال بواتساب..." };
-      } else if (connection === "close") {
-        const err = lastDisconnect?.error as { output?: { statusCode?: number } } | undefined;
-        const code = err?.output?.statusCode;
-        if (code === DisconnectReason.loggedOut) {
-          g.status = {
-            state: "disconnected",
-            detail: "تم تسجيل الخروج من الهاتف. يلزم إعادة الربط من جديد.",
-            pairingCode: null,
-          };
-          g.sock = null;
-        } else {
+      try {
+        const { connection, lastDisconnect } = update;
+        if (connection === "open") {
+          g.reconnectAttempts = 0;
+          g.status = { state: "connected", detail: "متصل بواتساب", pairingCode: null };
+        } else if (connection === "connecting") {
+          g.status = { ...g.status, state: "connecting", detail: "جارٍ الاتصال بواتساب..." };
+        } else if (connection === "close") {
+          const err = lastDisconnect?.error as { output?: { statusCode?: number } } | undefined;
+          const code = err?.output?.statusCode;
+
+          if (code === DisconnectReason.loggedOut || !state.creds.registered) {
+            // Either the phone unlinked us, or this session never finished
+            // pairing in the first place (e.g. the code expired before it
+            // was entered). Either way, retrying against these credentials
+            // would just fail the same way forever — stop and clear them
+            // so the next attempt from /admin/whatsapp starts clean.
+            g.sock = null;
+            g.reconnectAttempts = 0;
+            resetAuthDir();
+            g.status = {
+              state: "disconnected",
+              detail:
+                code === DisconnectReason.loggedOut
+                  ? "تم تسجيل الخروج من الهاتف. يلزم إعادة الربط من جديد."
+                  : "لم تكتمل عملية الربط (قد يكون الرمز انتهت صلاحيته). حاول الربط من جديد.",
+              pairingCode: null,
+            };
+            return;
+          }
+
+          g.reconnectAttempts += 1;
+          if (g.reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
+            g.sock = null;
+            g.reconnectAttempts = 0;
+            g.status = {
+              state: "disconnected",
+              detail: "تعذّرت إعادة الاتصال بعد عدة محاولات. حاول لاحقاً من صفحة الإدارة.",
+              pairingCode: null,
+            };
+            return;
+          }
+
           g.status = { ...g.status, state: "connecting", detail: "انقطع الاتصال، تتم إعادة المحاولة..." };
+          const delay = Math.min(5000 * g.reconnectAttempts, 60_000);
           setTimeout(() => {
             g.starting = false;
-            void startWhatsApp();
-          }, 5000);
-          return;
+            startWhatsApp().catch((e) => console.error("[whatsapp] reconnect failed:", e));
+          }, delay);
         }
+      } catch (err) {
+        console.error("[whatsapp] connection.update handler error:", err);
       }
     });
 
@@ -131,6 +177,14 @@ export async function startWhatsApp(phoneNumberForPairing?: string): Promise<voi
       const code = await sock.requestPairingCode(digitsOnly);
       g.status = { state: "pairing", detail: "أدخل هذا الرمز في هاتفك خلال دقيقة", pairingCode: code };
     }
+  } catch (err) {
+    console.error("[whatsapp] startWhatsApp failed:", err);
+    g.status = {
+      state: "disconnected",
+      detail: "تعذّر بدء الاتصال بواتساب. حاول مجدداً بعد قليل.",
+      pairingCode: null,
+    };
+    g.sock = null;
   } finally {
     g.starting = false;
   }
@@ -138,10 +192,15 @@ export async function startWhatsApp(phoneNumberForPairing?: string): Promise<voi
 
 export async function listGroups(): Promise<{ jid: string; name: string }[]> {
   if (!g.sock || g.status.state !== "connected") return [];
-  const groups = await g.sock.groupFetchAllParticipating();
-  return Object.values(groups)
-    .filter((meta) => isJidGroup(meta.id))
-    .map((meta) => ({ jid: meta.id, name: meta.subject }));
+  try {
+    const groups = await g.sock.groupFetchAllParticipating();
+    return Object.values(groups)
+      .filter((meta) => isJidGroup(meta.id))
+      .map((meta) => ({ jid: meta.id, name: meta.subject }));
+  } catch (err) {
+    console.error("[whatsapp] listGroups failed:", err);
+    return [];
+  }
 }
 
 export async function sendWhatsAppTestMessage(): Promise<{ ok: boolean; error?: string }> {
