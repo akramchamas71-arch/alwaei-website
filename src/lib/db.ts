@@ -111,6 +111,30 @@ db.exec(
   `UPDATE admin_users SET name = 'أكرم شمص' WHERE name = 'أكرم شمس'`
 );
 
+// Migration: add a dedicated "breaking" (عاجل) category for short wire-style
+// items auto-imported from external breaking-news RSS feeds (see
+// src/lib/breakingNews.ts). Same race guard as the migrations above: a
+// plain existence check before the INSERT, with the INSERT itself wrapped
+// in try/catch in case two workers lose the race at the same time.
+const breakingCategoryExists = db
+  .prepare("SELECT 1 FROM categories WHERE slug = 'breaking'")
+  .get();
+if (!breakingCategoryExists) {
+  try {
+    const maxOrder = db
+      .prepare("SELECT COALESCE(MAX(sort_order), -1) AS m FROM categories")
+      .get() as { m: number };
+    db.prepare(
+      "INSERT INTO categories (slug, name, sort_order) VALUES ('breaking', 'عاجل', ?)"
+    ).run(maxOrder.m + 1);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!/unique constraint/i.test(message)) {
+      throw err;
+    }
+  }
+}
+
 export function getSetting(key: string, fallback = ""): string {
   const row = db
     .prepare("SELECT value FROM site_settings WHERE key = ?")
