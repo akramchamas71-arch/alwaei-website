@@ -115,9 +115,42 @@ export async function startWhatsApp(phoneNumberForPairing?: string): Promise<voi
 
     sock.ev.on("creds.update", saveCreds);
 
+    // Requesting a pairing code only works once the socket has completed its
+    // initial handshake with WhatsApp's servers and emitted a `qr` value —
+    // calling sock.requestPairingCode() right after makeWASocket() (before
+    // that handshake finishes) races the connection and baileys throws
+    // "Connection Closed" almost immediately, before any code is ever
+    // issued. So instead of requesting it eagerly, request it from inside
+    // connection.update, gated on `qr` being present, matching baileys' own
+    // official pairing-code example.
+    let pairingRequested = false;
+
+    if (phoneNumberForPairing && !state.creds.registered) {
+      g.status = { state: "pairing", detail: "جارٍ طلب رمز الربط...", pairingCode: null };
+    }
+
     sock.ev.on("connection.update", (update) => {
       try {
-        const { connection, lastDisconnect } = update;
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr && phoneNumberForPairing && !state.creds.registered && !pairingRequested) {
+          pairingRequested = true;
+          const digitsOnly = phoneNumberForPairing.replace(/[^0-9]/g, "");
+          sock
+            .requestPairingCode(digitsOnly)
+            .then((code) => {
+              g.status = { state: "pairing", detail: "أدخل هذا الرمز في هاتفك خلال دقيقة", pairingCode: code };
+            })
+            .catch((err) => {
+              console.error("[whatsapp] requestPairingCode failed:", err);
+              g.status = {
+                state: "disconnected",
+                detail: "تعذّر طلب رمز الربط. حاول مجدداً.",
+                pairingCode: null,
+              };
+            });
+        }
+
         if (connection === "open") {
           g.reconnectAttempts = 0;
           g.status = { state: "connected", detail: "متصل بواتساب", pairingCode: null };
@@ -170,13 +203,6 @@ export async function startWhatsApp(phoneNumberForPairing?: string): Promise<voi
         console.error("[whatsapp] connection.update handler error:", err);
       }
     });
-
-    if (phoneNumberForPairing && !state.creds.registered) {
-      g.status = { state: "pairing", detail: "جارٍ طلب رمز الربط...", pairingCode: null };
-      const digitsOnly = phoneNumberForPairing.replace(/[^0-9]/g, "");
-      const code = await sock.requestPairingCode(digitsOnly);
-      g.status = { state: "pairing", detail: "أدخل هذا الرمز في هاتفك خلال دقيقة", pairingCode: code };
-    }
   } catch (err) {
     console.error("[whatsapp] startWhatsApp failed:", err);
     g.status = {
