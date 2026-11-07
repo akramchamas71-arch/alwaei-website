@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import makeWASocket, {
   useMultiFileAuthState,
@@ -27,6 +27,7 @@ const GROUP_JID_KEY = "whatsapp_group_jid";
 const GROUP_NAME_KEY = "whatsapp_group_name";
 const SEND_SPACING_MS = 2500;
 const MAX_RECONNECT_ATTEMPTS = 5;
+const CONNECT_TIMEOUT_MS = 30_000;
 
 export type WhatsAppStatus = {
   state: "disconnected" | "connecting" | "pairing" | "connected";
@@ -72,8 +73,23 @@ function resetAuthDir() {
   }
 }
 
+// A creds.json file gets written to disk as soon as a pairing attempt
+// starts (useMultiFileAuthState scaffolds it immediately), well before
+// pairing actually succeeds — so its mere existence doesn't mean the
+// device is linked. Only auto-resume on boot for a session that actually
+// finished registering; otherwise the boot-time auto-resume would try to
+// "resume" a half-finished session that can never connect, hanging in
+// "connecting" forever on every server restart.
 export function hasStoredCredentials(): boolean {
-  return existsSync(path.join(AUTH_DIR, "creds.json"));
+  const credsPath = path.join(AUTH_DIR, "creds.json");
+  if (!existsSync(credsPath)) return false;
+  try {
+    const raw = JSON.parse(readFileSync(credsPath, "utf-8")) as { registered?: boolean };
+    return raw.registered === true;
+  } catch (err) {
+    console.error("[whatsapp] failed to read stored credentials:", err);
+    return false;
+  }
 }
 
 export function getWhatsAppStatus(): WhatsAppStatus {
@@ -129,9 +145,29 @@ export async function startWhatsApp(phoneNumberForPairing?: string): Promise<voi
       g.status = { state: "pairing", detail: "جارٍ طلب رمز الربط...", pairingCode: null };
     }
 
+    // baileys' own handshake timeout doesn't always fire if the underlying
+    // TCP/TLS connection to WhatsApp's servers never completes (e.g. it's
+    // silently dropped by the network rather than actively refused) — that
+    // leaves the socket stuck reporting "connecting" forever, with no close
+    // event to react to. Force it closed after a bounded wait so a dead
+    // connection attempt always resolves into a clear status instead of
+    // hanging indefinitely.
+    const connectTimeout = setTimeout(() => {
+      console.error("[whatsapp] connection attempt timed out after", CONNECT_TIMEOUT_MS, "ms — forcing close");
+      try {
+        sock.end(new Error("connect timeout"));
+      } catch (err) {
+        console.error("[whatsapp] failed to force-close timed-out socket:", err);
+      }
+    }, CONNECT_TIMEOUT_MS);
+
     sock.ev.on("connection.update", (update) => {
       try {
         const { connection, lastDisconnect, qr } = update;
+
+        if (connection === "open" || connection === "close") {
+          clearTimeout(connectTimeout);
+        }
 
         if (qr && phoneNumberForPairing && !state.creds.registered && !pairingRequested) {
           pairingRequested = true;
