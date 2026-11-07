@@ -19,6 +19,13 @@ import { getCategoryBySlug } from "./data";
 // Add a source here once a feed with a real breaking-news marker is found
 // for it; everything else (dedupe, publishing, the ticker) already supports
 // any number of sources.
+//
+// Al Manar specifically uses a DEDICATED feed for this, not the generic
+// /rss filtered by <category>عاجل</category>: their own homepage has an
+// "الأخبار العاجلة" toggle that's powered by https://www.almanar.com.lb/c/urgent/rss,
+// which is far more complete (every item is pre-filtered as urgent by
+// Al Manar itself — the generic feed's <category> tag only caught a small
+// fraction of what actually shows on their live ticker).
 type ParsedItem = {
   guid: string;
   title: string;
@@ -36,10 +43,14 @@ type Source = {
 
 const SOURCES: Source[] = [
   {
-    key: "almanar",
+    key: "almanar-urgent",
     name: "قناة المنار",
-    url: "https://www.almanar.com.lb/rss",
-    isBreaking: (item) => item.categories.includes("عاجل"),
+    url: "https://www.almanar.com.lb/c/urgent/rss",
+    // Every item in this feed is already urgent-news-only by construction
+    // (it's Al Manar's own dedicated "عاجل" feed), so no further filtering
+    // is needed — but keep the <category> check too as a harmless safety
+    // net in case the feed ever mixes in non-urgent items.
+    isBreaking: (item) => item.categories.length === 0 || item.categories.includes("عاجل"),
   },
 ];
 
