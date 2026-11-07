@@ -22,6 +22,7 @@ export default async function AdminLayout({
                 <Link href="/admin" className="hover:text-white">المقالات</Link>
                 <Link href="/admin/articles/new" className="hover:text-white">مقالة جديدة</Link>
                 <Link href="/admin/categories" className="hover:text-white">الأقسام</Link>
+                <Link href="/admin/whatsapp" className="hover:text-white">واتساب</Link>
                 <Link href="/" target="_blank" className="hover:text-white">عرض الموقع ↗</Link>
               </nav>
             </div>

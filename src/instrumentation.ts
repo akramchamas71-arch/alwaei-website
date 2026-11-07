@@ -20,4 +20,14 @@ export async function register() {
   // Give the server a few seconds to finish booting before the first poll.
   setTimeout(run, 15_000);
   setInterval(run, POLL_INTERVAL_MS);
+
+  // Resume the WhatsApp connection on boot, but only if it was already
+  // linked before (credentials saved from a previous pairing) — a first
+  // pairing is only ever started explicitly from /admin/whatsapp, never
+  // automatically.
+  import("@/lib/whatsapp")
+    .then(({ hasStoredCredentials, startWhatsApp }) => {
+      if (hasStoredCredentials()) void startWhatsApp();
+    })
+    .catch((err) => console.error("[whatsapp] resume failed:", err));
 }

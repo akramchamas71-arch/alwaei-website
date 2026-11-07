@@ -1,4 +1,6 @@
 import { db } from "./db";
+import { sendWhatsAppText } from "./whatsapp";
+import { SITE_URL } from "./site";
 
 // node:sqlite returns row objects with a null prototype, which React
 // refuses to pass from Server Components to Client Components. Convert
@@ -166,7 +168,27 @@ export function createArticle(input: ArticleInput): number {
     input.is_featured,
     input.published_at
   );
-  return Number(result.lastInsertRowid);
+  const id = Number(result.lastInsertRowid);
+
+  if (input.status === "published") {
+    // Best-effort, never allowed to slow down or fail a publish: WhatsApp
+    // delivery runs after the fact and swallows its own errors.
+    notifyWhatsApp(input).catch((err) => console.error("[whatsapp] notify failed:", err));
+  }
+
+  return id;
+}
+
+async function notifyWhatsApp(input: ArticleInput): Promise<void> {
+  const category = db
+    .prepare("SELECT slug FROM categories WHERE id = ?")
+    .get(input.category_id) as { slug: string } | undefined;
+  const url = `${SITE_URL}/article/${input.slug}`;
+  const isBreaking = category?.slug === "breaking";
+  const text = isBreaking
+    ? `\ud83d\udd34 عاجل | ${input.title}\n\n${url}`
+    : `\ud83d\udcf0 ${input.title}${input.excerpt ? `\n\n${input.excerpt}` : ""}\n\n${url}`;
+  await sendWhatsAppText(text);
 }
 
 export function updateArticle(id: number, input: ArticleInput) {
