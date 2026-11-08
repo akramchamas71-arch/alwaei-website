@@ -1,12 +1,18 @@
 import Link from "next/link";
-import { getPublishedArticles } from "@/lib/data";
+import { getBreakingArticles, getPublishedArticles } from "@/lib/data";
 
 // A dark scrolling bar for the latest headlines, shown at the top of the
 // homepage. Pure CSS marquee (no JS, no library) so it never blocks
 // hydration; pauses on hover and falls back to a horizontally-scrollable
 // list when the visitor has asked for reduced motion.
+//
+// Shows actual "breaking" (عاجل) wire items specifically, not just
+// whatever was published most recently — falls back to the latest
+// published articles overall only on the rare day nothing breaking has
+// come in yet, so the ticker is never empty.
 export default function BreakingTicker() {
-  const latest = getPublishedArticles(8);
+  const breaking = getBreakingArticles(8);
+  const latest = breaking.length > 0 ? breaking : getPublishedArticles(8);
   if (latest.length === 0) return null;
 
   // Duplicate the list once so the looping animation has no visible seam.

@@ -390,3 +390,112 @@ select:focus-visible {
   font-size: 0.75rem;
   color: var(--muted);
 }
+
+/* ---- Breaking-news homepage box ---- */
+
+.breaking-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-inline-start: 4px solid var(--alert);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem 0.5rem;
+}
+
+.breaking-box-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.breaking-box-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--alert);
+  flex-shrink: 0;
+  animation: breaking-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes breaking-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.breaking-box-title {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--alert);
+  flex: 1;
+}
+
+.breaking-box-all {
+  font-size: 0.8rem;
+  color: var(--muted);
+  transition: color 0.2s;
+}
+
+.breaking-box-all:hover,
+.breaking-box-all:focus-visible {
+  color: var(--brand);
+}
+
+.breaking-box-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.6rem;
+  padding-bottom: 0.6rem;
+}
+
+@media (min-width: 640px) {
+  .breaking-box-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .breaking-box-list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.breaking-box-item {
+  display: block;
+  height: 100%;
+  padding: 0.75rem 0.85rem;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.breaking-box-item-title {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--foreground);
+  transition: color 0.2s;
+}
+
+.breaking-box-item:hover .breaking-box-item-title,
+.breaking-box-item:focus-visible .breaking-box-item-title {
+  color: var(--brand);
+}
+
+.breaking-box-item-time {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .breaking-box-dot {
+    animation: none;
+  }
+}

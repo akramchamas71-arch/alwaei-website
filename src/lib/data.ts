@@ -70,6 +70,39 @@ export function getPublishedArticles(limit = 100, offset = 0): Article[] {
   );
 }
 
+// Like getPublishedArticles, but leaves out a given category (by slug).
+// Used on the homepage's "latest articles" grid so the high-volume
+// breaking-news wire items (auto-imported every few minutes — see
+// breakingNews.ts) don't flood out the site's actual analysis pieces;
+// breaking items get their own ticker + box instead (see getBreakingArticles).
+export function getPublishedArticlesExcludingCategory(
+  categorySlug: string,
+  limit = 100,
+  offset = 0
+): Article[] {
+  return plainAll(
+    db
+      .prepare(
+        `${ARTICLE_JOIN} WHERE a.status = \'published\' AND c.slug != ?
+         ORDER BY a.published_at DESC LIMIT ? OFFSET ?`
+      )
+      .all(categorySlug, limit, offset) as Article[]
+  );
+}
+
+// The most recent "breaking" (عاجل) wire items, for the homepage ticker
+// and breaking-news box.
+export function getBreakingArticles(limit = 20, offset = 0): Article[] {
+  return plainAll(
+    db
+      .prepare(
+        `${ARTICLE_JOIN} WHERE a.status = \'published\' AND c.slug = \'breaking\'
+         ORDER BY a.published_at DESC LIMIT ? OFFSET ?`
+      )
+      .all(limit, offset) as Article[]
+  );
+}
+
 export function getFeaturedArticles(limit = 5): Article[] {
   return plainAll(
     db

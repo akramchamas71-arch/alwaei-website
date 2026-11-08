@@ -1,8 +1,13 @@
 import Link from "next/link";
-import { getFeaturedArticles, getPublishedArticles, getCategories } from "@/lib/data";
+import {
+  getFeaturedArticles,
+  getPublishedArticlesExcludingCategory,
+  getCategories,
+} from "@/lib/data";
 import { formatDate } from "@/lib/format";
 import ArticleCard from "@/components/ArticleCard";
 import BreakingTicker from "@/components/BreakingTicker";
+import BreakingBox from "@/components/BreakingBox";
 import Reveal from "@/components/Reveal";
 
 // Always render with the latest data from the database: this is a
@@ -12,7 +17,10 @@ export const dynamic = "force-dynamic";
 
 export default function HomePage() {
   const featured = getFeaturedArticles(6);
-  const latest = getPublishedArticles(13);
+  // Breaking (عاجل) wire items get their own ticker + box below instead —
+  // there are far too many of them published per day for them to also
+  // flood the "latest articles" grid of full article cards.
+  const latest = getPublishedArticlesExcludingCategory("breaking", 13);
   const categories = getCategories();
 
   const [hero, ...restFeatured] = featured;
@@ -68,6 +76,12 @@ export default function HomePage() {
             </section>
           </Reveal>
         )}
+
+        <Reveal>
+          <div className="mb-10">
+            <BreakingBox />
+          </div>
+        </Reveal>
 
         <Reveal>
           <section className="mb-10">
