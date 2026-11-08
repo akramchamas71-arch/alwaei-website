@@ -21,8 +21,8 @@ export default async function WhatsAppAdminPage({
   searchParams: Promise<{ test?: string }>;
 }) {
   const sp = await searchParams;
-  const status = getWhatsAppStatus();
-  const group = getConfiguredGroup();
+  const status = await getWhatsAppStatus();
+  const group = await getConfiguredGroup();
   const groups = status.state === "connected" ? await listGroups() : [];
 
   return (

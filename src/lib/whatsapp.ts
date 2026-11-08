@@ -1,33 +1,16 @@
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
-import path from "node:path";
-import makeWASocket, {
-  useMultiFileAuthState,
-  fetchLatestBaileysVersion,
-  DisconnectReason,
-  isJidGroup,
-  type WASocket,
-} from "baileys";
-import pino from "pino";
-import { getSetting, setSetting } from "./db";
-
-// Sends newly-published articles (daily brief, manual publishes, and the
-// breaking-news poller — see breakingNews.ts) to a WhatsApp group, by
-// linking this server as a "linked device" on an existing WhatsApp
-// account, the same mechanism as WhatsApp Web/Desktop. There is no
-// official Meta API for posting into a pre-existing personal/group chat
-// (the official Cloud API's Groups feature is capped at 8 participants and
-// only works for groups the business itself creates), so this uses the
-// `baileys` library to drive a real linked-device session instead. That
-// means it is not an approach Meta endorses or guarantees; keep the
-// message volume modest (this app only sends one message per published
-// article, queued with a short delay between sends) to look like normal,
-// not spam-like, use of a linked device.
-const AUTH_DIR = path.join(process.cwd(), "data", "whatsapp-auth");
-const GROUP_JID_KEY = "whatsapp_group_jid";
-const GROUP_NAME_KEY = "whatsapp_group_name";
-const SEND_SPACING_MS = 2500;
-const MAX_RECONNECT_ATTEMPTS = 5;
-const CONNECT_TIMEOUT_MS = 30_000;
+// Thin HTTP client for the standalone WhatsApp bridge service, which runs
+// on its own dedicated VPS rather than alongside the main site on
+// Railway. A baileys "linked device" session needs one persistent Node
+// process and a disk that's never wiped; Railway redeploys (which happen
+// on every code push to this site) tore down the container's filesystem
+// and killed the WhatsApp session each time the site was updated. See the
+// whatsapp-service repo for the actual baileys connection logic — this
+// file just forwards to it over HTTP, keeping the same function names and
+// shapes the rest of this app already calls (admin/whatsapp page +
+// actions, and the publish-notification hook in data.ts), so nothing
+// else had to change.
+const SERVICE_URL = process.env.WHATSAPP_SERVICE_URL;
+const API_KEY = process.env.WHATSAPP_SERVICE_API_KEY;
 
 export type WhatsAppStatus = {
   state: "disconnected" | "connecting" | "pairing" | "connected";
@@ -35,265 +18,98 @@ export type WhatsAppStatus = {
   pairingCode: string | null;
 };
 
-const globalForWa = globalThis as unknown as {
-  __alwaei_wa?: {
-    sock: WASocket | null;
-    status: WhatsAppStatus;
-    starting: boolean;
-    sendQueue: Promise<void>;
-    reconnectAttempts: number;
-  };
+const OFFLINE_STATUS: WhatsAppStatus = {
+  state: "disconnected",
+  detail: "خدمة واتساب غير مُعدّة على هذا الموقع.",
+  pairingCode: null,
 };
 
-const g =
-  globalForWa.__alwaei_wa ??
-  {
-    sock: null as WASocket | null,
-    status: { state: "disconnected", detail: "غير مرتبط بعد", pairingCode: null } as WhatsAppStatus,
-    starting: false,
-    sendQueue: Promise.resolve(),
-    reconnectAttempts: 0,
-  };
-if (!globalForWa.__alwaei_wa) globalForWa.__alwaei_wa = g;
-
-const logger = pino({ level: "error" });
-
-function ensureAuthDir() {
-  if (!existsSync(AUTH_DIR)) mkdirSync(AUTH_DIR, { recursive: true });
+function configured(): boolean {
+  return Boolean(SERVICE_URL && API_KEY);
 }
 
-// Wipes a never-completed or logged-out session so the next pairing
-// attempt starts from a clean slate instead of repeatedly retrying
-// against stale, broken credentials.
-function resetAuthDir() {
+async function call<T>(
+  method: "GET" | "POST",
+  path: string,
+  body?: unknown
+): Promise<T | null> {
+  if (!configured()) return null;
   try {
-    if (existsSync(AUTH_DIR)) rmSync(AUTH_DIR, { recursive: true, force: true });
-  } catch (err) {
-    console.error("[whatsapp] failed to reset auth dir:", err);
-  }
-}
-
-// A creds.json file gets written to disk as soon as a pairing attempt
-// starts (useMultiFileAuthState scaffolds it immediately), well before
-// pairing actually succeeds — so its mere existence doesn't mean the
-// device is linked. Only auto-resume on boot for a session that actually
-// finished registering; otherwise the boot-time auto-resume would try to
-// "resume" a half-finished session that can never connect, hanging in
-// "connecting" forever on every server restart.
-export function hasStoredCredentials(): boolean {
-  const credsPath = path.join(AUTH_DIR, "creds.json");
-  if (!existsSync(credsPath)) return false;
-  try {
-    const raw = JSON.parse(readFileSync(credsPath, "utf-8")) as { registered?: boolean };
-    return raw.registered === true;
-  } catch (err) {
-    console.error("[whatsapp] failed to read stored credentials:", err);
-    return false;
-  }
-}
-
-export function getWhatsAppStatus(): WhatsAppStatus {
-  return g.status;
-}
-
-export function getConfiguredGroup(): { jid: string; name: string } | null {
-  const jid = getSetting(GROUP_JID_KEY, "");
-  if (!jid) return null;
-  return { jid, name: getSetting(GROUP_NAME_KEY, jid) };
-}
-
-export function setConfiguredGroup(jid: string, name: string): void {
-  setSetting(GROUP_JID_KEY, jid);
-  setSetting(GROUP_NAME_KEY, name);
-}
-
-// Starts (or resumes) the WhatsApp connection. Pass a phone number only
-// when the admin is actively pairing a brand-new device; omit it to just
-// resume an already-linked session (e.g. on server boot). Never throws —
-// every failure is reported through getWhatsAppStatus() instead, so a
-// bad phone number or a dropped connection can't crash the admin page
-// that triggered it (or, via the boot-time auto-resume, the server).
-export async function startWhatsApp(phoneNumberForPairing?: string): Promise<void> {
-  if (g.starting) return;
-  g.starting = true;
-  try {
-    ensureAuthDir();
-    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-    const { version } = await fetchLatestBaileysVersion();
-
-    const sock = makeWASocket({
-      version,
-      auth: state,
-      logger,
-      browser: ["Alwaei News", "Chrome", "1.0"],
+    const res = await fetch(`${SERVICE_URL}${path}`, {
+      method,
+      headers: {
+        "x-api-key": API_KEY as string,
+        ...(body ? { "Content-Type": "application/json" } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      // This is a small cross-service call to a single VPS the admin
+      // panel is actively waiting on — never let it hang indefinitely.
+      signal: AbortSignal.timeout(15_000),
     });
-    g.sock = sock;
-
-    sock.ev.on("creds.update", saveCreds);
-
-    // Requesting a pairing code only works once the socket has completed its
-    // initial handshake with WhatsApp's servers and emitted a `qr` value —
-    // calling sock.requestPairingCode() right after makeWASocket() (before
-    // that handshake finishes) races the connection and baileys throws
-    // "Connection Closed" almost immediately, before any code is ever
-    // issued. So instead of requesting it eagerly, request it from inside
-    // connection.update, gated on `qr` being present, matching baileys' own
-    // official pairing-code example.
-    let pairingRequested = false;
-
-    if (phoneNumberForPairing && !state.creds.registered) {
-      g.status = { state: "pairing", detail: "جارٍ طلب رمز الربط...", pairingCode: null };
+    if (!res.ok) {
+      console.error(`[whatsapp] ${method} ${path} failed with status ${res.status}`);
+      return null;
     }
-
-    // baileys' own handshake timeout doesn't always fire if the underlying
-    // TCP/TLS connection to WhatsApp's servers never completes (e.g. it's
-    // silently dropped by the network rather than actively refused) — that
-    // leaves the socket stuck reporting "connecting" forever, with no close
-    // event to react to. Force it closed after a bounded wait so a dead
-    // connection attempt always resolves into a clear status instead of
-    // hanging indefinitely.
-    const connectTimeout = setTimeout(() => {
-      console.error("[whatsapp] connection attempt timed out after", CONNECT_TIMEOUT_MS, "ms — forcing close");
-      try {
-        sock.end(new Error("connect timeout"));
-      } catch (err) {
-        console.error("[whatsapp] failed to force-close timed-out socket:", err);
-      }
-    }, CONNECT_TIMEOUT_MS);
-
-    sock.ev.on("connection.update", (update) => {
-      try {
-        const { connection, lastDisconnect, qr } = update;
-
-        if (connection === "open" || connection === "close") {
-          clearTimeout(connectTimeout);
-        }
-
-        if (qr && phoneNumberForPairing && !state.creds.registered && !pairingRequested) {
-          pairingRequested = true;
-          const digitsOnly = phoneNumberForPairing.replace(/[^0-9]/g, "");
-          sock
-            .requestPairingCode(digitsOnly)
-            .then((code) => {
-              g.status = { state: "pairing", detail: "أدخل هذا الرمز في هاتفك خلال دقيقة", pairingCode: code };
-            })
-            .catch((err) => {
-              console.error("[whatsapp] requestPairingCode failed:", err);
-              g.status = {
-                state: "disconnected",
-                detail: "تعذّر طلب رمز الربط. حاول مجدداً.",
-                pairingCode: null,
-              };
-            });
-        }
-
-        if (connection === "open") {
-          g.reconnectAttempts = 0;
-          g.status = { state: "connected", detail: "متصل بواتساب", pairingCode: null };
-        } else if (connection === "connecting") {
-          g.status = { ...g.status, state: "connecting", detail: "جارٍ الاتصال بواتساب..." };
-        } else if (connection === "close") {
-          const err = lastDisconnect?.error as { output?: { statusCode?: number } } | undefined;
-          const code = err?.output?.statusCode;
-
-          if (code === DisconnectReason.loggedOut || !state.creds.registered) {
-            // Either the phone unlinked us, or this session never finished
-            // pairing in the first place (e.g. the code expired before it
-            // was entered). Either way, retrying against these credentials
-            // would just fail the same way forever — stop and clear them
-            // so the next attempt from /admin/whatsapp starts clean.
-            g.sock = null;
-            g.reconnectAttempts = 0;
-            resetAuthDir();
-            g.status = {
-              state: "disconnected",
-              detail:
-                code === DisconnectReason.loggedOut
-                  ? "تم تسجيل الخروج من الهاتف. يلزم إعادة الربط من جديد."
-                  : "لم تكتمل عملية الربط (قد يكون الرمز انتهت صلاحيته). حاول الربط من جديد.",
-              pairingCode: null,
-            };
-            return;
-          }
-
-          g.reconnectAttempts += 1;
-          if (g.reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
-            g.sock = null;
-            g.reconnectAttempts = 0;
-            g.status = {
-              state: "disconnected",
-              detail: "تعذّرت إعادة الاتصال بعد عدة محاولات. حاول لاحقاً من صفحة الإدارة.",
-              pairingCode: null,
-            };
-            return;
-          }
-
-          g.status = { ...g.status, state: "connecting", detail: "انقطع الاتصال، تتم إعادة المحاولة..." };
-          const delay = Math.min(5000 * g.reconnectAttempts, 60_000);
-          setTimeout(() => {
-            g.starting = false;
-            startWhatsApp().catch((e) => console.error("[whatsapp] reconnect failed:", e));
-          }, delay);
-        }
-      } catch (err) {
-        console.error("[whatsapp] connection.update handler error:", err);
-      }
-    });
+    return (await res.json()) as T;
   } catch (err) {
-    console.error("[whatsapp] startWhatsApp failed:", err);
-    g.status = {
-      state: "disconnected",
-      detail: "تعذّر بدء الاتصال بواتساب. حاول مجدداً بعد قليل.",
-      pairingCode: null,
-    };
-    g.sock = null;
-  } finally {
-    g.starting = false;
+    console.error(`[whatsapp] ${method} ${path} failed:`, err);
+    return null;
   }
+}
+
+export async function getWhatsAppStatus(): Promise<WhatsAppStatus> {
+  if (!configured()) return OFFLINE_STATUS;
+  const res = await call<{ ok: boolean; status: WhatsAppStatus }>("GET", "/status");
+  return res?.status ?? {
+    state: "disconnected",
+    detail: "تعذّر الاتصال بخدمة واتساب.",
+    pairingCode: null,
+  };
+}
+
+export async function getConfiguredGroup(): Promise<{ jid: string; name: string } | null> {
+  if (!configured()) return null;
+  const res = await call<{ ok: boolean; group: { jid: string; name: string } | null }>(
+    "GET",
+    "/status"
+  );
+  return res?.group ?? null;
+}
+
+export async function setConfiguredGroup(jid: string, _name: string): Promise<void> {
+  // The service resolves the display name itself from a fresh group list
+  // server-side (same reasoning as before: don't trust a client-supplied
+  // name for whichever radio option was actually selected).
+  void _name;
+  await call("POST", "/group", { jid });
+}
+
+// Pass a phone number only when the admin is actively pairing a brand-new
+// device; the service handles resuming an already-linked session on its
+// own boot, so this site never needs to trigger that itself.
+export async function startWhatsApp(phoneNumberForPairing?: string): Promise<void> {
+  if (!phoneNumberForPairing) return;
+  await call("POST", "/pair", { phone: phoneNumberForPairing });
 }
 
 export async function listGroups(): Promise<{ jid: string; name: string }[]> {
-  if (!g.sock || g.status.state !== "connected") return [];
-  try {
-    const groups = await g.sock.groupFetchAllParticipating();
-    return Object.values(groups)
-      .filter((meta) => isJidGroup(meta.id))
-      .map((meta) => ({ jid: meta.id, name: meta.subject }));
-  } catch (err) {
-    console.error("[whatsapp] listGroups failed:", err);
-    return [];
-  }
+  const res = await call<{ ok: boolean; groups: { jid: string; name: string }[] }>(
+    "GET",
+    "/groups"
+  );
+  return res?.groups ?? [];
 }
 
 export async function sendWhatsAppTestMessage(): Promise<{ ok: boolean; error?: string }> {
-  const group = getConfiguredGroup();
-  if (!group) return { ok: false, error: "لم يتم اختيار مجموعة بعد" };
-  const ok = await sendWhatsAppText("✅ تم ربط موقع الوعي بنجاح بهذه المجموعة.");
-  return { ok, error: ok ? undefined : "فشل الإرسال — تحقق من حالة الاتصال" };
+  if (!configured()) return { ok: false, error: "خدمة واتساب غير مُعدّة" };
+  const res = await call<{ ok: boolean; error?: string }>("POST", "/test");
+  return res ?? { ok: false, error: "تعذّر الاتصال بخدمة واتساب" };
 }
 
-// Fire-and-forget from the article-publishing path: queued so concurrent
-// publishes (e.g. a burst of breaking-news items) go out one at a time
-// with a short gap between them, instead of several messages landing in
-// the same instant — a steadier, less bot-like pace.
-export function sendWhatsAppText(text: string): Promise<boolean> {
-  const task = g.sendQueue.then(async () => {
-    const group = getConfiguredGroup();
-    if (!group || !g.sock || g.status.state !== "connected") return false;
-    try {
-      await g.sock.sendMessage(group.jid, { text });
-      return true;
-    } catch (err) {
-      console.error("[whatsapp] send failed:", err);
-      return false;
-    } finally {
-      await new Promise((r) => setTimeout(r, SEND_SPACING_MS));
-    }
-  });
-  // Keep the queue chain alive regardless of this call's outcome.
-  g.sendQueue = task.then(
-    () => undefined,
-    () => undefined
-  );
-  return task;
+// Fire-and-forget from the article-publishing path (see data.ts); never
+// throws, so a WhatsApp hiccup can't fail a publish.
+export async function sendWhatsAppText(text: string): Promise<boolean> {
+  if (!configured()) return false;
+  const res = await call<{ ok: boolean }>("POST", "/send", { text });
+  return res?.ok ?? false;
 }

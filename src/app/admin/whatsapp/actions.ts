@@ -35,7 +35,7 @@ export async function selectGroupAction(formData: FormData) {
     // browser can't correlate to the selected radio reliably).
     const groups = await listGroups();
     const match = groups.find((g) => g.jid === jid);
-    setConfiguredGroup(jid, match?.name || jid);
+    await setConfiguredGroup(jid, match?.name || jid);
   }
   revalidatePath("/admin/whatsapp");
   redirect("/admin/whatsapp");

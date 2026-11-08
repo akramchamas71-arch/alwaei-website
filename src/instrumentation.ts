@@ -21,13 +21,7 @@ export async function register() {
   setTimeout(run, 15_000);
   setInterval(run, POLL_INTERVAL_MS);
 
-  // Resume the WhatsApp connection on boot, but only if it was already
-  // linked before (credentials saved from a previous pairing) — a first
-  // pairing is only ever started explicitly from /admin/whatsapp, never
-  // automatically.
-  import("@/lib/whatsapp")
-    .then(({ hasStoredCredentials, startWhatsApp }) => {
-      if (hasStoredCredentials()) void startWhatsApp();
-    })
-    .catch((err) => console.error("[whatsapp] resume failed:", err));
+  // WhatsApp itself runs as a separate standalone service on its own VPS
+  // (see src/lib/whatsapp.ts) and resumes its own session on its own
+  // boot — this site has nothing to do on startup for it anymore.
 }
